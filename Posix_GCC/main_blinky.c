@@ -38,14 +38,20 @@
 #include "console.h"
 
 #include "airbag.h"
+#include "serial_line.h"
+
+#include "aes.h"
 
 #define mainAIRBAG_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
+#define mainSERIAL_LINE_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
 
-#define mainTASK_AIRBAG_FREQUENCY_MS         pdMS_TO_TICKS( 1UL )
+#define mainTASK_AIRBAG_FREQUENCY_MS         pdMS_TO_TICKS( 100UL )
+#define mainTASK_SERIAL_LINE_FREQUENCY_MS         pdMS_TO_TICKS( 200UL )
 
 /*-----------------------------------------------------------*/
 
 static void airbagTask( void * pvParameters );
+static void serialLineTask( void * pvParameters );
 
 /*-----------------------------------------------------------*/
 
@@ -56,6 +62,13 @@ void main_blinky( void )
                 configMINIMAL_STACK_SIZE,
                 NULL, //task parameters
                 mainAIRBAG_TASK_PRIORITY,
+                NULL );
+
+    xTaskCreate( serialLineTask,
+                "serialLineTask",
+                configMINIMAL_STACK_SIZE,
+                NULL, //task parameters
+                mainSERIAL_LINE_TASK_PRIORITY,
                 NULL );
 
     vTaskStartScheduler();
@@ -80,6 +93,44 @@ static void airbagTask( void * pvParameters )
     {
         console_print("airbag outer loop\n");
         airbagLoop(&xNextWakeTime, xBlockTime);
+    }
+}
+/*-----------------------------------------------------------*/
+
+static void serialLineTask( void * pvParameters )
+{
+    TickType_t xNextWakeTime;
+    const TickType_t xBlockTime = mainTASK_SERIAL_LINE_FREQUENCY_MS;
+
+    /* Prevent the compiler warning about the unused parameter. */
+    ( void ) pvParameters;
+
+    xNextWakeTime = xTaskGetTickCount();
+
+
+    //initialize array which should contain encrypted result of status message
+	unsigned char* serialLineData = calloc(N_BLOCK, sizeof(unsigned char));
+	//initialize dummy status message
+	unsigned char* serialLineStatusMessage = "serial status";
+	//initialize AES for serial line
+	initSerialLine();
+
+    for( ; ; )
+    {
+        //receive a command from serial line
+        int command = receiveCommand();
+        //print command for debug purposes. There are two possible commands:
+        //COMMAND_A and COMMAND_B
+        char logStr[80];
+        sprintf(logStr, "Command %c received on serial line\n", command == COMMAND_A ? 'A' : 'B');
+        console_print(logStr);
+        //encrypt dummy status message. Result is written to serialLineData
+        prepareToSendOnSerialLine(serialLineStatusMessage, serialLineData);
+        //send encrypted status message on serial line. This call is protected by a mutex
+        sendOnSerialLine(serialLineData, N_BLOCK, 0);
+        //sendOnSerialLine("hello world", N_BLOCK, 0);
+        //sleep 100 ms
+        vTaskDelayUntil( &xNextWakeTime, xBlockTime );
     }
 }
 /*-----------------------------------------------------------*/
