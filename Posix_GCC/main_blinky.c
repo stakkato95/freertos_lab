@@ -47,8 +47,8 @@
 #define mainSERIAL_LINE_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
 #define mainMEMORY_CHECK_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
 
-#define mainTASK_AIRBAG_FREQUENCY_MS         pdMS_TO_TICKS( 100UL )
-#define mainTASK_SERIAL_LINE_FREQUENCY_MS         pdMS_TO_TICKS( 200UL )
+#define mainTASK_AIRBAG_FREQUENCY_MS         pdMS_TO_TICKS( 1UL )
+#define mainTASK_SERIAL_LINE_FREQUENCY_MS         pdMS_TO_TICKS( 100UL )
 #define mainTASK_MEMORY_CHECK_FREQUENCY_MS         pdMS_TO_TICKS( 500UL )
 
 /*-----------------------------------------------------------*/
