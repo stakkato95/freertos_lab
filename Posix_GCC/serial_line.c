@@ -12,6 +12,8 @@
 
 #include "aes.h"
 
+#include "console.h"
+
 #define RECEIVE_DUMMY_LOOP 1000000
 #define SEND_DUMMY_LOOP 100000
 

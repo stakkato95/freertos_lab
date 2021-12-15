@@ -39,19 +39,23 @@
 
 #include "airbag.h"
 #include "serial_line.h"
+#include "memory_check.h"
 
 #include "aes.h"
 
 #define mainAIRBAG_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
 #define mainSERIAL_LINE_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
+#define mainMEMORY_CHECK_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
 
 #define mainTASK_AIRBAG_FREQUENCY_MS         pdMS_TO_TICKS( 100UL )
 #define mainTASK_SERIAL_LINE_FREQUENCY_MS         pdMS_TO_TICKS( 200UL )
+#define mainTASK_MEMORY_CHECK_FREQUENCY_MS         pdMS_TO_TICKS( 500UL )
 
 /*-----------------------------------------------------------*/
 
 static void airbagTask( void * pvParameters );
 static void serialLineTask( void * pvParameters );
+static void memoryCheckTask( void * pvParameters );
 
 /*-----------------------------------------------------------*/
 
@@ -69,6 +73,13 @@ void main_blinky( void )
                 configMINIMAL_STACK_SIZE,
                 NULL, //task parameters
                 mainSERIAL_LINE_TASK_PRIORITY,
+                NULL );
+
+    xTaskCreate( memoryCheckTask,
+                "memoryCheckTask",
+                configMINIMAL_STACK_SIZE,
+                NULL, //task parameters
+                mainMEMORY_CHECK_TASK_PRIORITY,
                 NULL );
 
     vTaskStartScheduler();
@@ -130,6 +141,37 @@ static void serialLineTask( void * pvParameters )
         sendOnSerialLine(serialLineData, N_BLOCK, 0);
         //sendOnSerialLine("hello world", N_BLOCK, 0);
         //sleep 100 ms
+        vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+    }
+}
+/*-----------------------------------------------------------*/
+
+static void memoryCheckTask( void * pvParameters )
+{
+    TickType_t xNextWakeTime;
+    const TickType_t xBlockTime = mainTASK_MEMORY_CHECK_FREQUENCY_MS;
+
+    /* Prevent the compiler warning about the unused parameter. */
+    ( void ) pvParameters;
+
+    xNextWakeTime = xTaskGetTickCount();
+
+
+    //initialize array, which should contain results of flash check
+	unsigned char* flashCheckResult = calloc(N_BLOCK, sizeof(unsigned char));
+	//initialize AES and a dummy flash segment from memory_check.c
+	initMemoryCheck();
+
+    for( ; ; )
+    {
+        //calculate CRC, encrypt it with AES and wrote to flashCheckResult
+        performMemoryCheck(flashCheckResult);
+        //send flashCheckResult on serial line if it's currently available
+        //(serial line is a shared resource protected with a mutex).
+        //parameter "1" is a debug flag to indicate that sendOnSerialLine
+        //was called from taskMemoryCheck. It's needed for debug purposes.
+        sendOnSerialLine(flashCheckResult, N_BLOCK, 1);
+        //sleep for 500 ms
         vTaskDelayUntil( &xNextWakeTime, xBlockTime );
     }
 }
